@@ -1,0 +1,91 @@
+---
+title: "ActivityAnalysis"
+author: "Miranda Ma"
+date: "April 17, 2016"
+output: html_document
+---
+
+
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+
+library(rmarkdown)
+library(dplyr)
+library(ggplot2)
+library(knitr)
+
+setwd("C:/Users/xiaoyma/Desktop/Project1")
+
+# read in data
+
+raw_data <- read.csv("activity.csv")
+
+# clean the data
+
+raw_data$day <- weekdays(as.Date(raw_data$date))
+raw_data$DateTime<- as.POSIXct(raw_data$date, format="%Y-%m-%d")
+data <- raw_data[!is.na(data$steps),]
+
+# summarize steps by day
+
+steps_per_day <- 
+  
+  data %>%
+  group_by(date) %>%
+  summarise(mean=mean(steps),total=sum(steps))
+
+# histogram
+
+hist(steps_per_day$total,main="Total Steps Per Day",col="blue",xlab="steps")
+
+# Time series plot
+
+steps_by_interval <- data %>%
+  group_by(interval) %>%
+  summarise(mean=mean(steps))
+  
+plot(steps_by_interval$interval, steps_by_interval$mean,type = "l",xlab = "interval",ylab = "average steps",main = "Average Steps by Time Interval")
+
+max_interval <- steps_by_interval[which.max(steps_by_interval$mean),1]
+
+# replcae the missing values
+
+incomplete <- sum(!complete.cases(raw_data))
+
+imputed_data <- transform(raw_data, steps = ifelse(is.na(raw_data$steps), steps_by_interval$mean[match(raw_data$interval, steps_by_interval$interval)],raw_data$steps))
+
+imputed_data[as.character(imputed_data$date) == "2012-10-01", 1] <- 0
+
+steps_per_day_missing_value_filled <- imputed_data %>%
+  group_by(date) %>%
+  summarise(mean=mean(steps),total=sum(steps))
+  
+filled <- mutate(steps_per_day_missing_value_filled, category = "NA_filled")
+non_filled <- mutate(steps_per_day, category = "NA_removed")
+
+plot_data <- rbind(filled, non_filled)
+
+# plot total steps taken per day and compare the two datasets with NA removed or filled
+
+qplot(total, data = plot_data, geom = "histogram",binwidth = 5000, xlab="Total Steps per Day", ylab = "Days", main = "Total Steps per Day Summary",fill="red") + facet_grid(category ~ .)
+
+# create a variable for weekday vs. weekend
+
+weekday <- ifelse(imputed_data$day %in% c("Monday", "Tuesday", "Wednesday", "Thursday", 
+                                                                "Friday"), "weekday", "weekend")
+
+weekday_data <- mutate(imputed_data, weekday = weekday)
+
+# create a plot to show average steps
+plot_data2 <- weekday_data %>%
+  group_by(weekday, interval) %>%
+  summarise(average=mean(steps))
+
+qplot(interval, average, data = plot_data2, main = "Average Steps Taken per Day",geom="line")  + facet_grid(weekday ~.)
+
+
